@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+from scipy.stats import multivariate_normal
+
 
 # def model(N,x0,y0,alpha):
 #     phi = np.array([])
@@ -64,6 +66,160 @@ def calculate_model_positions(params, hole_indices):
         model_positions[section_idx] = section_positions
     
     return model_positions
+
+def compute_model_predictions(theta, data_indices):
+    """
+    Compute the model predictions for hole locations based on parameter vector theta.
+    
+    Parameters:
+        - theta: 
+        The parameter vector which includes:
+        - r: radius of the circle
+        - N: number of holes in the original complete ring
+        - sigma parameters (either single sigma or sigma_r and sigma_t)
+        - For each section j: x_j, y_j, alpha_j (translation and rotation)
+    
+    data_indices: Indices of holes in the original configuration for each measured hole
+    
+    Returns:
+        - model_positions: Predicted (x,y) positions of each hole based on the model
+    """
+    # Extract parameters from theta
+    r = theta[0]                # radius of the ring
+    N = theta[1]                # number of holes in the complete ring
+    
+    # The remaining parameters depend on how many sections there are
+    # Assuming 8 sections (j ∈ {0, 1, 2, ..., 7})
+    num_sections = 8
+    
+    # Check if we're using isotropic or radial/tangential covariance
+    if len(theta) == 2 + 1 + 3*num_sections:  # isotropic case
+        sigma_offset = 3
+    else:  # radial/tangential case
+        sigma_offset = 4
+    
+    # Calculate the original positions (before transformations)
+    # Original positions on the circle
+    angle_step = 2 * np.pi / N
+    original_positions = np.zeros((len(data_indices), 2))
+    
+    for i, idx in enumerate(data_indices):
+        angle = idx * angle_step
+        original_positions[i, 0] = r * np.cos(angle)
+        original_positions[i, 1] = r * np.sin(angle)
+    
+    # Apply transformations for each section
+    model_positions = np.zeros_like(original_positions)
+    section_indices = np.zeros(len(data_indices), dtype=int)
+    
+    # Assuming section_indices is given for each hole in the data
+    # For each section, apply the transformation
+    for j in range(num_sections):
+        # Extract transformation parameters for this section
+        x_j = theta[sigma_offset + 3*j]
+        y_j = theta[sigma_offset + 3*j + 1]
+        alpha_j = theta[sigma_offset + 3*j + 2]
+        
+        # Get holes belonging to this section
+        section_mask = (section_indices == j)
+        
+        if np.any(section_mask):
+            # Get the original positions for this section
+            section_orig_pos = original_positions[section_mask]
+            
+            # Apply rotation
+            rot_matrix = np.array([
+                [np.cos(alpha_j), -np.sin(alpha_j)],
+                [np.sin(alpha_j), np.cos(alpha_j)]
+            ])
+            
+            # Apply rotation and translation
+            rotated = np.dot(section_orig_pos, rot_matrix.T)
+            translated = rotated + np.array([x_j, y_j])
+            
+            # Store the transformed positions
+            model_positions[section_mask] = translated
+    
+    return model_positions
+
+def log_likelihood(theta, data_positions, data_indices, section_indices, covariance_type="isotropic"):
+    """
+    Calculate the log-likelihood given the parameters and data.
+    
+    Parameters:
+    -----------
+    theta : array-like
+        The parameter vector
+    data_positions : ndarray
+        Measured (x,y) positions of each hole
+    data_indices : array-like
+        Indices of holes in the original configuration
+    section_indices : array-like
+        Section index for each hole
+    covariance_type : str
+        Type of covariance matrix: "isotropic" or "radial_tangential"
+    
+    Returns:
+    --------
+    log_likelihood : float
+        The log-likelihood value
+    """
+    # Extract parameters
+    r = theta[0]
+    N = theta[1]
+    
+    if covariance_type == "isotropic":
+        sigma = theta[2]
+        # Isotropic covariance matrix
+        cov_matrix = np.eye(2) * sigma**2
+    else:  # radial_tangential
+        sigma_r = theta[2]
+        sigma_t = theta[3]
+        # We'll construct the covariance matrix for each hole separately
+    
+    # Compute model predictions
+    model_positions = compute_model_predictions(theta, data_indices)
+    
+    # Calculate log-likelihood
+    log_like = 0.0
+    
+    for i in range(len(data_positions)):
+        data_pos = data_positions[i]
+        model_pos = model_positions[i]
+        
+        if covariance_type == "isotropic":
+            # Use the same covariance matrix for all holes
+            mvn = multivariate_normal(mean=model_pos, cov=cov_matrix)
+            log_like += mvn.logpdf(data_pos)
+        else:
+            # For radial/tangential, we need to construct the covariance matrix
+            # based on the position of each hole
+            angle = np.arctan2(model_pos[1], model_pos[0])
+            # Radial and tangential unit vectors
+            radial = np.array([np.cos(angle), np.sin(angle)])
+            tangential = np.array([-np.sin(angle), np.cos(angle)])
+            
+            # Construct rotation matrix to transform from (radial, tangential) to (x, y)
+            rotation = np.column_stack((radial, tangential))
+            
+            # Diagonal covariance in (radial, tangential) coordinates
+            diag_cov = np.diag([sigma_r**2, sigma_t**2])
+            
+            # Transform to (x, y) coordinates
+            cov_matrix = rotation @ diag_cov @ rotation.T
+            
+            # Calculate likelihood
+            mvn = multivariate_normal(mean=model_pos, cov=cov_matrix)
+            log_like += mvn.logpdf(data_pos)
+    
+    return log_like
+
+def negative_log_likelihood(theta, data_positions, data_indices, section_indices, covariance_type="isotropic"):
+    """
+    Calculate the negative log-likelihood for optimization purposes.
+    """
+    return -log_likelihood(theta, data_positions, data_indices, section_indices, covariance_type)
+
 
 def plot_holes(data, measured_positions, model_positions=None):
     """
@@ -147,6 +303,7 @@ def main():
     
     # Plot the results
     plot_holes(data, measured_positions, model_positions)
+
 
 if __name__ == "__main__":
     main()
