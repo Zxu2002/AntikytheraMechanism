@@ -15,29 +15,26 @@ class AntikytheraModel(nn.Module):
         self.covariance_type = covariance_type
         self.section_ids = sorted(section_ids)
         
-        # Define model parameters as nn.Parameter to track gradients properly
         self.r = nn.Parameter(torch.tensor(77.0, dtype=torch.float64))
         self.N = nn.Parameter(torch.tensor(354.0, dtype=torch.float64))
         
-        # Covariance parameters
         if covariance_type == "isotropic":
             self.sigma = nn.Parameter(torch.tensor(0.5, dtype=torch.float64))
         else:
             self.sigma_r = nn.Parameter(torch.tensor(0.2, dtype=torch.float64))
             self.sigma_t = nn.Parameter(torch.tensor(0.5, dtype=torch.float64))
         
-        # Section parameters: x0, y0, alpha for each section
-        # Initialize with reasonable values
+    
+        # Initialize
         section_params = {}
         for i, section in enumerate(self.section_ids):
-            # Default values that are reasonable for all sections
             x0 = 80.0 + 0.5 * i
             y0 = 136.0
             alpha = -145.0 - i
             
             section_params[section] = [x0, y0, alpha]
         
-        # Create parameters for each section
+        # Create parameters 
         for section in self.section_ids:
             x0, y0, alpha = section_params[section]
             setattr(self, f'x0_{section}', nn.Parameter(torch.tensor(x0, dtype=torch.float64)))
@@ -73,21 +70,18 @@ class AntikytheraModel(nn.Module):
             for i in indices:
                 i_tensor = torch.tensor(float(i), dtype=torch.float64)
                 
-                # Calculate the angular position (in radians)
+            
                 phi = 2 * torch.pi * (i_tensor - 1) / self.N
-                
-                # Add rotation angle (convert from degrees to radians)
+               
                 phi = phi + torch.deg2rad(alpha)
                 
-                # Calculate coordinates
                 x = x0 + self.r * torch.cos(phi)
                 y = y0 + self.r * torch.sin(phi)
-                
-                # Combine as a tensor
+            
                 pos = torch.stack([x, y])
                 section_positions.append(pos)
             
-            if section_positions:  # Check if there are positions to convert
+            if section_positions:  
                 model_positions[section] = torch.stack(section_positions)
         
         return model_positions
@@ -121,10 +115,9 @@ class AntikytheraModel(nn.Module):
         Returns:
             Negative log-likelihood as a scalar tensor
         """
-        # Convert data to tensors
+       
         data_positions = self.data_to_tensor(data)
         
-        # Get model predictions
         model_positions = self.calculate_model_positions(hole_indices)
         
         # Initialize negative log-likelihood
@@ -132,7 +125,6 @@ class AntikytheraModel(nn.Module):
         log_2pi = torch.log(torch.tensor(2 * np.pi, dtype=torch.float64))
         
         if self.covariance_type == "isotropic":
-            # For isotropic case
             cov_matrix = torch.eye(2, dtype=torch.float64) * (self.sigma**2)
             inv_cov = torch.inverse(cov_matrix)
             log_det = torch.log(torch.det(cov_matrix))
@@ -144,13 +136,12 @@ class AntikytheraModel(nn.Module):
                 data_pos = data_positions[section]
                 model_pos = model_positions[section]
                 
-                # Calculate multivariate normal log PDF for each hole
                 for i in range(len(data_pos)):
                     diff = data_pos[i] - model_pos[i]
                     term = torch.dot(diff, torch.matmul(inv_cov, diff))
                     nll = nll + 0.5 * (term + log_det + 2 * log_2pi)
         
-        else:  # radial_tangential case
+        else: 
             for section in data_positions.keys():
                 if section not in model_positions:
                     continue
@@ -159,33 +150,25 @@ class AntikytheraModel(nn.Module):
                 model_pos = model_positions[section]
                 x0, y0, _ = self.get_section_params(section)
                 
-                # Calculate log-likelihood for each hole
                 for i in range(len(data_pos)):
                     # Vector from center to hole
                     dx = model_pos[i][0] - x0
                     dy = model_pos[i][1] - y0
                     r_mag = torch.sqrt(dx**2 + dy**2)
                     
-                    # Avoid division by zero
                     r_mag = torch.max(r_mag, torch.tensor(1e-10, dtype=torch.float64))
                     
-                    # Radial and tangential unit vectors
                     radial = torch.tensor([dx/r_mag, dy/r_mag], dtype=torch.float64)
                     tangential = torch.tensor([-dy/r_mag, dx/r_mag], dtype=torch.float64)
                     
-                    # Rotation matrix
                     rotation = torch.stack([radial, tangential], dim=1)
                     
-                    # Covariance matrix in (r, t) coordinates
                     diag_cov = torch.diag(torch.tensor([self.sigma_r**2, self.sigma_t**2], dtype=torch.float64))
                     
-                    # Transform to (x, y) coordinates
                     cov_matrix = torch.matmul(rotation, torch.matmul(diag_cov, rotation.t()))
                     
-                    # Avoid singular matrices
                     cov_matrix = cov_matrix + torch.eye(2, dtype=torch.float64) * 1e-10
                     
-                    # Inverse and determinant
                     inv_cov = torch.inverse(cov_matrix)
                     log_det = torch.log(torch.det(cov_matrix))
                     
