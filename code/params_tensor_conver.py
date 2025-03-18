@@ -41,8 +41,6 @@ def convert_params_to_array(params, covariance_type="isotropic"):
             param_array.append(params['section_params'][section][i])
             param_names.append(f'section_{section}_{param_name}')
     
-    print(param_array)
-    print(param_names)
             
     return np.array(param_array), param_names
 
@@ -57,7 +55,7 @@ def convert_array_to_params(param_array, param_names, template_params):
     
     for i, name in enumerate(param_names):
         if name == 'r':
-            params['r'] = param_array[i]  # Keep as tensor
+            params['r'] = param_array[i]
         elif name == 'N':
             params['N'] = param_array[i]  # Keep as tensor
         elif name == 'sigma':

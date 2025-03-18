@@ -155,8 +155,7 @@ def test_torch_gradient():
     
     return grad_dict
 
-
-if __name__ == "__main__":
+def main():
     initial_params = {
         'N': 354.0,  # Initial guess for number of holes
         'r': 77.0,   # Initial guess for radius (mm)
@@ -180,3 +179,5 @@ if __name__ == "__main__":
     print("Testing PyTorch automatic differentiation for the Antikythera mechanism model")
     print(test_torch_gradient())
     
+if __name__ == "__main__":
+    main()

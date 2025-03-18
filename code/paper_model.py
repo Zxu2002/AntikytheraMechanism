@@ -156,9 +156,9 @@ def log_likelihood(params_tensor, param_names, template_params, data, hole_indic
                 log_like = log_like -0.5 * (term + log_det + 2 * log_2pi)
     
     else:  # radial_tangential case
+        
         sigma_r = params["sigma_r"]
         sigma_t = params["sigma_t"]
-        
         for section in data_positions.keys():
             if section not in model_positions:
                 continue
@@ -206,21 +206,28 @@ def log_likelihood(params_tensor, param_names, template_params, data, hole_indic
     if len(data) == 0 or all(section not in model_positions for section in data_positions.keys()):
         # Create a simple differentiable expression based on params
         log_like = -0.5 * torch.sum(params_tensor ** 2)
+        log_like.backward(retain_graph=True)
+        print(f"Gradient norm: {params_tensor.grad.norm() if params_tensor.grad is not None else 'No Gradients'}")
+
         return log_like
+    
+    log_like.backward(retain_graph=True)
+    print(f"Gradient norm: {params_tensor.grad.norm() if params_tensor.grad is not None else 'No Gradients'}")
+
     return log_like
 
-def negative_log_likelihood(theta, data, hole_indices, covariance_type="isotropic"):
+def negative_log_likelihood(params_tensor, param_names, theta, data, hole_indices, covariance_type="isotropic"):
     """
     Calculate the negative log-likelihood for optimization purposes.
     """
-    return -log_likelihood(theta, data,hole_indices, covariance_type="isotropic")
+    return -log_likelihood(params_tensor, param_names, theta, data, hole_indices, covariance_type=covariance_type)
 
 def tensor_to_list(tensor):
     if torch.is_tensor(tensor):
         return tensor.tolist()
     return tensor
 
-def plot_holes(data, measured_positions, model_positions):
+def plot_holes(data, measured_positions, model_positions, fig_title = 'Antikythera Mechanism Calendar Ring Hole Positions',fig_save_path='graphs/predicted_hole_positions.png'):
     """
     Plot the measured hole positions and optionally the model predictions.
     
@@ -260,11 +267,11 @@ def plot_holes(data, measured_positions, model_positions):
     
     plt.xlabel('X (mm)')
     plt.ylabel('Y (mm)')
-    plt.title('Antikythera Mechanism Calendar Ring Hole Positions')
+    plt.title(fig_title)
     plt.grid(True)
     plt.axis('equal')
     plt.legend()
-    plt.savefig('graphs/predicted_hole_positions.png')
+    plt.savefig(fig_save_path)
     plt.show()
 
 def main():

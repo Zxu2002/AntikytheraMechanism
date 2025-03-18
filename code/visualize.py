@@ -1,8 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
-
-if __name__ == "__main__":
+def main():
     file_path = "data/1-Fragment_C_Hole_Measurements.csv"  
     data = pd.read_csv(file_path)
 
@@ -26,3 +25,8 @@ if __name__ == "__main__":
     plt.legend(title="Section ID")
     plt.savefig("graphs/measured_hole_positions.png")
     plt.show()
+
+    
+if __name__ == "__main__":
+    main()
+
