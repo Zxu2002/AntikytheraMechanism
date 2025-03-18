@@ -2,32 +2,9 @@ import torch
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from antikythera_model import AntikytheraModel
+from antikythera_model import AntikytheraModel, load_hole_data
 
-def load_hole_data(filename):
-    """
-    Load the hole location data from the file.
-    
-    Args:
-        filename: Path to the data file
-        
-    Returns:
-        data: DataFrame with measured data
-        measured_positions: Dictionary mapping section indices to lists of hole coordinates
-        hole_indices: Dictionary mapping section indices to lists of hole indices
-    """
-    data = pd.read_csv(filename)
-    
-    # Convert measured positions to hole indices
-    measured_positions = {}
-    for section, group in data.groupby("Section ID"):
-        measured_positions[section] = [np.array([x, y]) for x, y in zip(group["Mean(X)"], group["Mean(Y)"]) ]
 
-    hole_indices = {}
-    for section, positions in measured_positions.items():
-        hole_indices[section] = list(range(1, len(positions) + 1))
-    
-    return data, measured_positions, hole_indices
 
 def optimize_model(data, hole_indices, model_type="isotropic", learning_rate=0.001, num_iterations=1000):
     """
@@ -74,7 +51,7 @@ def optimize_model(data, hole_indices, model_type="isotropic", learning_rate=0.0
         if i % 10 == 0:
             print(f"Iteration {i}: Loss = {loss.item():.4f}, Gradient norm = {total_norm:.4f}")
             
-            # Print first few parameter gradients
+            # Print few parameter gradients (debug)
             for name, param in list(model.named_parameters())[:5]:
                 if param.grad is not None:
                     print(f"  {name}: grad = {param.grad.data}")

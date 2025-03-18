@@ -25,7 +25,6 @@ def main():
     plt.legend(title="Section ID")
     plt.savefig("graphs/measured_hole_positions.png")
     plt.show()
-
     
 if __name__ == "__main__":
     main()

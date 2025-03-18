@@ -17,18 +17,21 @@ class AntikytheraModel(nn.Module):
         
         self.r = nn.Parameter(torch.tensor(77.0, dtype=torch.float64))
         self.N = nn.Parameter(torch.tensor(354.0, dtype=torch.float64))
-        
+
+
         if covariance_type == "isotropic":
-            self.sigma = nn.Parameter(torch.tensor(0.5, dtype=torch.float64))
+            self._log_sigma = nn.Parameter(torch.tensor(np.log(0.3), dtype=torch.float64))
+
+
         else:
-            self.sigma_r = nn.Parameter(torch.tensor(0.2, dtype=torch.float64))
-            self.sigma_t = nn.Parameter(torch.tensor(0.5, dtype=torch.float64))
+            self._log_sigma_r = nn.Parameter(torch.tensor(np.log(0.3), dtype=torch.float64))
+            self._log_sigma_t = nn.Parameter(torch.tensor(np.log(0.3), dtype=torch.float64))
         
     
         # Initialize
         section_params = {}
         for i, section in enumerate(self.section_ids):
-            x0 = 80.0 + 0.5 * i
+            x0 = 80.0 + i
             y0 = 136.0
             alpha = -145.0 - i
             
@@ -40,6 +43,34 @@ class AntikytheraModel(nn.Module):
             setattr(self, f'x0_{section}', nn.Parameter(torch.tensor(x0, dtype=torch.float64)))
             setattr(self, f'y0_{section}', nn.Parameter(torch.tensor(y0, dtype=torch.float64)))
             setattr(self, f'alpha_{section}', nn.Parameter(torch.tensor(alpha, dtype=torch.float64)))
+
+    @property
+    def sigma_r(self):
+        return torch.exp(self._log_sigma_r)
+            
+            
+    @property
+    def sigma_t(self):
+        return torch.exp(self._log_sigma_t)
+    
+    @property
+    def sigma(self):
+        return torch.exp(self._log_sigma)
+    
+    @property
+    def N(self):
+        return self._N_float.round() 
+    
+    def forward(self, section, hole_index):
+        """Predict hole position for a given section and index."""
+        x0, y0, alpha = self.get_section_params(section)
+        
+        # Compute expected hole location
+        theta = 2 * torch.pi * (hole_index - 1) / self.N 
+        x_pred = x0 + self.r * torch.cos(theta + torch.deg2rad(alpha))
+        y_pred = y0 + self.r * torch.sin(theta + torch.deg2rad(alpha))
+
+        return x_pred, y_pred
     
     def get_section_params(self, section):
         """Get parameters for a specific section."""
@@ -64,19 +95,13 @@ class AntikytheraModel(nn.Module):
             if section not in self.section_ids:
                 continue
                 
-            x0, y0, alpha = self.get_section_params(section)
             section_positions = []
             
             for i in indices:
                 i_tensor = torch.tensor(float(i), dtype=torch.float64)
                 
             
-                phi = 2 * torch.pi * (i_tensor - 1) / self.N
-               
-                phi = phi + torch.deg2rad(alpha)
-                
-                x = x0 + self.r * torch.cos(phi)
-                y = y0 + self.r * torch.sin(phi)
+                x,y = self.forward(section, i_tensor)
             
                 pos = torch.stack([x, y])
                 section_positions.append(pos)
@@ -203,3 +228,70 @@ class AntikytheraModel(nn.Module):
             params['section_params'][section] = [x0.item(), y0.item(), alpha.item()]
         
         return params
+def load_hole_data(filename):
+    """
+    Load the hole location data from the file.
+    
+    Args:
+        filename: Path to the data file
+        
+    Returns:
+        data: DataFrame with measured data
+        measured_positions: Dictionary mapping section indices to lists of hole coordinates
+        hole_indices: Dictionary mapping section indices to lists of hole indices
+    """
+    data = pd.read_csv(filename)
+    
+    # Convert measured positions to hole indices
+    measured_positions = {}
+    for section, group in data.groupby("Section ID"):
+        measured_positions[section] = [np.array([x, y]) for x, y in zip(group["Mean(X)"], group["Mean(Y)"]) ]
+
+    hole_indices = {}
+    for section, positions in measured_positions.items():
+        hole_indices[section] = list(range(1, len(positions) + 1))
+    
+    return data, measured_positions, hole_indices
+
+
+def main():
+    filename = "data/1-Fragment_C_Hole_Measurements.csv"
+    data, measured_positions, hole_indices = load_hole_data(filename)
+
+    section_id = [i for i in range(1,8)]
+    model = AntikytheraModel(section_id)
+
+    #plot the predicted hole positions
+    plt.figure(figsize=(10, 10))
+    unique_sections = data["Section ID"].unique()
+    colors = plt.cm.get_cmap("tab10", len(unique_sections))
+    section_colors = {}
+    for i, section in enumerate(measured_positions.keys()):
+        section_colors[section] = colors(i)
+    for section, positions in measured_positions.items():
+        color = section_colors.get(section, 'k')
+        if positions is not None:
+            xs, ys = zip(*positions)
+            plt.scatter(xs, ys, color=color, label=f'Section {section} (Measured)', marker='o', alpha=0.7)
+    model_positions = model.calculate_model_positions(hole_indices)
+    for section, positions in model_positions.items():
+        if section not in measured_positions:
+            continue
+        color = section_colors.get(section, 'k')
+        if positions is not None:
+            xs = [float(x) for x in positions[:, 0].detach().numpy()]
+            ys = [float(y) for y in positions[:, 1].detach().numpy()]
+            plt.scatter(xs, ys, color=color, label=f'Section {section} (Predicted)', marker='x', alpha=0.5, s=100)
+    plt.xlabel('X (mm)')
+    plt.ylabel('Y (mm)')
+    plt.title("Predicted Hole Locations in the X-Y Plane")
+    plt.grid(True)
+    plt.axis('equal')
+    plt.legend()
+    plt.savefig("graphs/predicted_hole_positions.png")
+    plt.show()
+
+    return 0 
+
+if __name__ == "__main__":
+    main()
