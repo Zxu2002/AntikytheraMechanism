@@ -6,7 +6,7 @@ from antikythera_model import AntikytheraModel, load_hole_data
 
 
 
-def optimize_model(data, hole_indices, model_type="isotropic", learning_rate=0.001, num_iterations=1000):
+def optimize_model(data, hole_indices, model_type="isotropic", learning_rate=0.0001, num_iterations=1000):
     """
     Find the maximum likelihood parameters using PyTorch optimization.
     

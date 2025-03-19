@@ -7,25 +7,29 @@ import matplotlib.pyplot as plt
 class AntikytheraModel(nn.Module):
     """
     PyTorch module for the Antikythera mechanism model.
-    This handles parameters properly within PyTorch's autograd framework.
+    This handles parameters for PyTorch's autograd functionality.
     """
     def __init__(self, section_ids, covariance_type="isotropic"):
+        """
+        Initialize the model with section parameters.
+
+        """
         super(AntikytheraModel, self).__init__()
         
         self.covariance_type = covariance_type
         self.section_ids = sorted(section_ids)
         
         self.r = nn.Parameter(torch.tensor(77.0, dtype=torch.float64))
-        self.N = nn.Parameter(torch.tensor(354.0, dtype=torch.float64))
+        self.N_float = nn.Parameter(torch.tensor(354.0, dtype=torch.float64))
 
 
         if covariance_type == "isotropic":
-            self._log_sigma = nn.Parameter(torch.tensor(np.log(0.3), dtype=torch.float64))
+            self._e_sigma = nn.Parameter(torch.tensor(np.exp(0.1), dtype=torch.float64))
 
 
         else:
-            self._log_sigma_r = nn.Parameter(torch.tensor(np.log(0.3), dtype=torch.float64))
-            self._log_sigma_t = nn.Parameter(torch.tensor(np.log(0.3), dtype=torch.float64))
+            self._e_sigma_r = nn.Parameter(torch.tensor(np.exp(0.02), dtype=torch.float64))
+            self._e_sigma_t = nn.Parameter(torch.tensor(np.exp(0.1), dtype=torch.float64))
         
     
         # Initialize
@@ -33,7 +37,7 @@ class AntikytheraModel(nn.Module):
         for i, section in enumerate(self.section_ids):
             x0 = 80.0 + i
             y0 = 136.0
-            alpha = -145.0 - i
+            alpha = -145.0 - 0.5 * i
             
             section_params[section] = [x0, y0, alpha]
         
@@ -46,20 +50,20 @@ class AntikytheraModel(nn.Module):
 
     @property
     def sigma_r(self):
-        return torch.exp(self._log_sigma_r)
+        return torch.exp(self._e_sigma_r)
             
             
     @property
     def sigma_t(self):
-        return torch.exp(self._log_sigma_t)
+        return torch.exp(self._e_sigma_t)
     
     @property
     def sigma(self):
-        return torch.exp(self._log_sigma)
+        return torch.exp(self._e_sigma)
     
     @property
     def N(self):
-        return self._N_float.round() 
+        return self.N_float.round() 
     
     def forward(self, section, hole_index):
         """Predict hole position for a given section and index."""
@@ -151,9 +155,8 @@ class AntikytheraModel(nn.Module):
         
         if self.covariance_type == "isotropic":
             cov_matrix = torch.eye(2, dtype=torch.float64) * (self.sigma**2)
-            inv_cov = torch.inverse(cov_matrix)
+            inv_cov = torch.eye(2, dtype=torch.float64) * 1/(self.sigma**2)
             log_det = torch.log(torch.det(cov_matrix))
-            
             for section in data_positions.keys():
                 if section not in model_positions:
                     continue
@@ -189,19 +192,19 @@ class AntikytheraModel(nn.Module):
                     rotation = torch.stack([radial, tangential], dim=1)
                     
                     diag_cov = torch.diag(torch.tensor([self.sigma_r**2, self.sigma_t**2], dtype=torch.float64))
-                    
+                    diag_cov_inv = torch.diag(torch.tensor([1/self.sigma_r**2, 1/self.sigma_t**2], dtype=torch.float64))
                     cov_matrix = torch.matmul(rotation, torch.matmul(diag_cov, rotation.t()))
                     
                     cov_matrix = cov_matrix + torch.eye(2, dtype=torch.float64) * 1e-10
                     
-                    inv_cov = torch.inverse(cov_matrix)
+                    inv_cov = torch.matmul(rotation, torch.matmul(diag_cov_inv, rotation.t()))
                     log_det = torch.log(torch.det(cov_matrix))
                     
                     diff = data_pos[i] - model_pos[i]
                     
                     term = torch.dot(diff, torch.matmul(inv_cov, diff))
                     nll = nll + 0.5 * (term + log_det + 2 * log_2pi)
-        
+
         return nll
     
     def to_dict(self):

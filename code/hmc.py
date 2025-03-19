@@ -16,6 +16,13 @@ data, measured_positions, hole_indices = load_hole_data(data_filename)
 
 
 def bayesian_model(covariance_model="isotropic"):
+    """
+    Bayesian model for the Antikythera mechanism.
+    
+    Parameters:
+        - covariance_model: The type of covariance model to use. 
+        
+        """
     # Ring parameters
     r = pyro.sample("r", dist.Normal(77.0, 5.0))  # Prior on ring radius
     N = pyro.sample("N", dist.Normal(354.0, 10.0))  # Prior on number of holes
@@ -62,11 +69,11 @@ def bayesian_model(covariance_model="isotropic"):
                 
                 mean_x, mean_y = model.forward(section_id, hole_idx)
                 
-                # Compute unit radial and tangential vectors
+                # Compute for change of coordinate 
                 r_hat = torch.tensor([mean_x, mean_y]) / torch.norm(torch.tensor([mean_x, mean_y]))
                 t_hat = torch.tensor([-r_hat[1], r_hat[0]])  # Perpendicular to r_hat
 
-                # Covariance matrix aligned with radial/tangential directions
+                # Covariance matrix aligned in radial/tangential directions
                 cov_matrix = (sigma_r**2) * torch.ger(r_hat, r_hat) + (sigma_t**2) * torch.ger(t_hat, t_hat)
                 pyro.sample(
                     f"obs_{section_id}_{hole_idx}",
@@ -75,32 +82,38 @@ def bayesian_model(covariance_model="isotropic"):
                 )
 
 
-# Run MCMC sampling
 def sampling(covariance_model="isotropic"):
+    """
+    Run MCMC sampling for the Antikythera mechanism.
+
+    Parameters:
+        - covariance_model: The type of covariance model to use.
+    
+    
+    """
     def model():
         return bayesian_model(covariance_model)
     nuts_kernel = NUTS(model)
     mcmc = MCMC(nuts_kernel, num_samples=100, warmup_steps=200, num_chains=1)
     mcmc.run()
 
-    # Extract posterior samples
     posterior_samples = mcmc.get_samples()
 
-    # Select a hole for visualization
+
     hole_section = list(measured_positions.keys())[1]  # Select the first section
-    hole_index = 0  # Select the first hole
+    hole_index = 0  
 
     # Create empty arrays for posterior predictive samples
     num_samples = len(posterior_samples['r'])
     pred_x = np.zeros(num_samples)
     pred_y = np.zeros(num_samples)
 
-    # Instantiate the model (same as in bayesian_model)
+  
     model = AntikytheraModel(section_ids=measured_positions.keys(), 
                             covariance_type=covariance_model)
 
     # Generate posterior predictive samples manually
-# Generate posterior predictive samples manually
+
     for i in range(num_samples):
         # Get parameters from posterior samples
         r_sample = posterior_samples['r'][i].item()
