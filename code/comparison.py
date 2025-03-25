@@ -42,6 +42,9 @@ def compare_models():
     # Extract model parameters
     params_iso = model_iso.to_dict()
     params_rt = model_rt.to_dict()
+    print(params_iso)
+    print("--------------------")
+    print(params_rt)
     
     # Get model predictions
     model_pos_iso = model_iso.calculate_model_positions(hole_indices)

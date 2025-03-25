@@ -28,7 +28,7 @@ class AntikytheraModel(nn.Module):
 
 
         else:
-            self._e_sigma_r = nn.Parameter(torch.tensor(np.exp(0.02), dtype=torch.float64))
+            self._e_sigma_r = nn.Parameter(torch.tensor(np.exp(0.025), dtype=torch.float64))
             self._e_sigma_t = nn.Parameter(torch.tensor(np.exp(0.1), dtype=torch.float64))
         
     
@@ -50,16 +50,16 @@ class AntikytheraModel(nn.Module):
 
     @property
     def sigma_r(self):
-        return torch.exp(self._e_sigma_r)
+        return torch.log(self._e_sigma_r)
             
             
     @property
     def sigma_t(self):
-        return torch.exp(self._e_sigma_t)
+        return torch.log(self._e_sigma_t)
     
     @property
     def sigma(self):
-        return torch.exp(self._e_sigma)
+        return torch.log(self._e_sigma)
     
     @property
     def N(self):

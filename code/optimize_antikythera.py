@@ -1,6 +1,4 @@
 import torch
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
 from antikythera_model import AntikytheraModel, load_hole_data
 
@@ -48,13 +46,13 @@ def optimize_model(data, hole_indices, model_type="isotropic", learning_rate=0.0
                 total_norm += param_norm.item() ** 2
         total_norm = total_norm ** 0.5
         
-        if i % 10 == 0:
-            print(f"Iteration {i}: Loss = {loss.item():.4f}, Gradient norm = {total_norm:.4f}")
+        # if i % 10 == 0:
+        #     print(f"Iteration {i}: Loss = {loss.item():.4f}, Gradient norm = {total_norm:.4f}")
             
-            # Print few parameter gradients (debug)
-            for name, param in list(model.named_parameters())[:5]:
-                if param.grad is not None:
-                    print(f"  {name}: grad = {param.grad.data}")
+        #     # Print few parameter gradients (debug)
+        #     for name, param in list(model.named_parameters())[:5]:
+        #         if param.grad is not None:
+        #             print(f"  {name}: grad = {param.grad.data}")
         
         if torch.isfinite(torch.tensor(total_norm)) and total_norm > 0:
             optimizer.step()
