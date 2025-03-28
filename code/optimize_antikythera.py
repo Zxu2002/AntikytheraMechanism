@@ -46,14 +46,6 @@ def optimize_model(data, hole_indices, model_type="isotropic", learning_rate=0.0
                 total_norm += param_norm.item() ** 2
         total_norm = total_norm ** 0.5
         
-        # if i % 10 == 0:
-        #     print(f"Iteration {i}: Loss = {loss.item():.4f}, Gradient norm = {total_norm:.4f}")
-            
-        #     # Print few parameter gradients (debug)
-        #     for name, param in list(model.named_parameters())[:5]:
-        #         if param.grad is not None:
-        #             print(f"  {name}: grad = {param.grad.data}")
-        
         if torch.isfinite(torch.tensor(total_norm)) and total_norm > 0:
             optimizer.step()
 
@@ -150,7 +142,7 @@ def main():
         hole_indices, 
         model_type="isotropic", 
         learning_rate=0.001,
-        num_iterations=500
+        num_iterations=1000
     )
     
     print("\nOptimized parameters (isotropic):")
@@ -181,7 +173,7 @@ def main():
         hole_indices, 
         model_type="radial_tangential", 
         learning_rate=0.001,
-        num_iterations=500
+        num_iterations=1000
     )
     
     # Print optimized parameters

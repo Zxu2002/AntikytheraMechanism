@@ -40,7 +40,7 @@ def bayesian_model(covariance_model="isotropic"):
     # Only sample the first hole from each section
     if covariance_model == "isotropic":
         # Sample the global sigma parameter once
-        sigma = pyro.sample("sigma", dist.HalfNormal(5.0))  # Standard deviation
+        sigma = pyro.sample("sigma", dist.HalfNormal(1.0))  # Standard deviation
         
         for section_id in measured_positions.keys():
             if len(measured_positions[section_id]) > 0:  
@@ -56,14 +56,14 @@ def bayesian_model(covariance_model="isotropic"):
                     dist.MultivariateNormal(torch.tensor([mean_x, mean_y]), covariance_matrix=cov_matrix),
                     obs=torch.tensor([x_obs, y_obs])
                 )
-    else:  # anisotropic
-        # Sample the global sigma parameters once
-        sigma_r = pyro.sample("sigma_r", dist.HalfNormal(5.0))  # Radial std dev
-        sigma_t = pyro.sample("sigma_t", dist.HalfNormal(5.0))  # Tangential std dev
+    else:  
+
+        sigma_r = pyro.sample("sigma_r", dist.HalfNormal(1.0))  
+        sigma_t = pyro.sample("sigma_t", dist.HalfNormal(1.0))  
         
         for section_id in measured_positions.keys():
             # Only use the first hole (index 0) from each section
-            if len(measured_positions[section_id]) > 0:  # Make sure there's at least one hole
+            if len(measured_positions[section_id]) > 0: 
                 hole_idx = 0
                 x_obs, y_obs = measured_positions[section_id][hole_idx]
                 
@@ -178,7 +178,7 @@ def sampling(covariance_model="isotropic"):
 
 def main():
     sampling("isotropic")
-    sampling("anisotropic")
+    sampling("Radial_tangential")
 
 if __name__ == "__main__":
     main()

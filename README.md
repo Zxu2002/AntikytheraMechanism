@@ -49,3 +49,23 @@ pip install -r requirements.txt
 
 ## Usage
 
+All commands below should be executed at the root of this directory. 
+
+
+The code that produces figure in (a) can be executed by:
+
+```sh
+python code/visualize.py
+```
+
+The model that the referenced paper described is inside `code/antikythera_model.py`. To use the model to generate predicted locations, please execute the following command:
+```sh
+python code/antikythera_model.py
+```
+
+The program that computes maximum likelihood paramter is `code/optimize_antikythera.py`. To regenerate the results, please run the following command:
+```sh
+python code/optimize_antikythera.py
+```
+
+

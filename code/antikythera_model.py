@@ -36,7 +36,7 @@ class AntikytheraModel(nn.Module):
         section_params = {}
         for i, section in enumerate(self.section_ids):
             x0 = 80.0 + i
-            y0 = 136.0
+            y0 = 136.0 + 0.5*i
             alpha = -145.0 - 0.5 * i
             
             section_params[section] = [x0, y0, alpha]
@@ -231,6 +231,44 @@ class AntikytheraModel(nn.Module):
             params['section_params'][section] = [x0.item(), y0.item(), alpha.item()]
         
         return params
+    
+
+    def diff_test(self):
+        print("Testing autodifferentiation...")
+        r2 = self.r**2
+        r2.backward()
+        print(f"r^2 gradient: {self.r.grad}")
+        self.r.grad.zero_()
+
+        rtwice = 2 * self.r
+        rtwice.backward()
+        print(f"2r gradient: {self.r.grad}")
+        self.r.grad.zero_()
+
+        # Test sigma parameters based on covariance type
+        if self.covariance_type == "isotropic":
+            # Operating directly on the parameter instead of through the property
+            sigma_expo = torch.exp(torch.log(self._e_sigma))
+            sigma_expo.backward()
+            print(f"exp(log(sigma)) gradient: {self._e_sigma.grad}")
+            self._e_sigma.grad.zero_()
+        else:
+            # For non-isotropic case, test both sigma_r and sigma_t
+            sigma_r_expo = torch.exp(torch.log(self._e_sigma_r))
+            sigma_r_expo.backward()
+            print(f"exp(log(sigma_r)) gradient: {self._e_sigma_r.grad}")
+            self._e_sigma_r.grad.zero_()
+            
+            sigma_t_expo = torch.exp(torch.log(self._e_sigma_t))
+            sigma_t_expo.backward()
+            print(f"exp(log(sigma_t)) gradient: {self._e_sigma_t.grad}")
+            self._e_sigma_t.grad.zero_()
+        
+        print("Autodifferentiation test passed.")
+        return 0
+
+    
+
 def load_hole_data(filename):
     """
     Load the hole location data from the file.
@@ -255,6 +293,10 @@ def load_hole_data(filename):
         hole_indices[section] = list(range(1, len(positions) + 1))
     
     return data, measured_positions, hole_indices
+
+
+
+
 
 
 def main():
@@ -294,6 +336,14 @@ def main():
     plt.savefig("graphs/predicted_hole_positions.png")
     plt.show()
 
+    model = AntikytheraModel(section_ids=section_id, covariance_type="isotropic")
+    model.diff_test()
+
+    
+
+
+
+    
     return 0 
 
 if __name__ == "__main__":
