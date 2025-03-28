@@ -33,11 +33,11 @@ def compare_models():
     # Optimize both models
     print("Optimizing isotropic model...")
     model_iso, _ = optimize_model(data, hole_indices, model_type="isotropic", 
-                                 learning_rate=0.001, num_iterations=500)
+                                 learning_rate=0.001, num_iterations=1000)
     
     print("Optimizing radial/tangential model...")
     model_rt, _ = optimize_model(data, hole_indices, model_type="radial_tangential", 
-                                learning_rate=0.001, num_iterations=500)
+                                learning_rate=0.001, num_iterations=1000)
     
     # Extract model parameters
     params_iso = model_iso.to_dict()
@@ -131,53 +131,14 @@ def compare_models():
     plt.tight_layout()
     plt.savefig("graphs/covariance_comparison.png")
     
-    # --- VISUALIZATION 2: Residual distributions ---
-    plt.figure(figsize=(8, 6))
-    
-    # Compute residuals for both models
-    residuals_iso = []
-    residuals_rt = []
-    
-    for section in measured_positions.keys():
-        if section not in model_pos_iso or section not in model_pos_rt:
-            continue
-            
-        for i, pos in enumerate(measured_positions[section]):
-            meas_pos = np.array(pos)
-            
-            # Get model predictions
-            pred_pos_iso = model_pos_iso[section][i].detach().numpy()
-            pred_pos_rt = model_pos_rt[section][i].detach().numpy()
-            
-            # Compute residuals
-            res_iso = np.linalg.norm(meas_pos - pred_pos_iso)
-            res_rt = np.linalg.norm(meas_pos - pred_pos_rt)
-            
-            residuals_iso.append(res_iso)
-            residuals_rt.append(res_rt)
-    
-    # Create histogram of residuals
-    bins = np.linspace(0, max(max(residuals_iso), max(residuals_rt)), 20)
-    plt.hist([residuals_iso, residuals_rt], bins=bins, 
-            label=['Isotropic', 'Radial/Tangential'],
-            color=['red', 'green'],rwidth=0.85)  
-
-    plt.title("Residual Distributions")
-    plt.xlabel("Residual Magnitude (mm)")
-    plt.ylabel("Count")
-    plt.grid(True, alpha=0.3)
-    plt.legend()
-    
-    plt.savefig("graphs/residual_comparison.png")
-    
     # --- QUANTITATIVE METRICS ---
     # Calculate log-likelihoods
     ll_iso = -model_iso.negative_log_likelihood(data, hole_indices).item()
     ll_rt = -model_rt.negative_log_likelihood(data, hole_indices).item()
     
     # Count parameters
-    k_iso = 3 + 3 * len(model_iso.section_ids)  # r, N, sigma, and 3 params per section
-    k_rt = 4 + 3 * len(model_rt.section_ids)    # r, N, sigma_r, sigma_t, and 3 params per section
+    k_iso = 3 + 3 * len(model_iso.section_ids)  
+    k_rt = 4 + 3 * len(model_rt.section_ids)   
     
     # Sample size
     n = sum(len(positions) for positions in measured_positions.values())
@@ -206,9 +167,9 @@ def compare_models():
     plt.figure(figsize=(10, 6))
     
     # Better scale by plotting the negative values for AIC/BIC
-    metrics = ['Log-Likelihood', '-AIC', '-BIC']
-    iso_values = [ll_iso, -aic_iso, -bic_iso]
-    rt_values = [ll_rt, -aic_rt, -bic_rt]
+    metrics = ['Log-Likelihood', 'AIC', 'BIC']
+    iso_values = [ll_iso, aic_iso, bic_iso]
+    rt_values = [ll_rt, aic_rt, bic_rt]
     
     x = np.arange(len(metrics))
     width = 0.35
@@ -219,7 +180,7 @@ def compare_models():
     plt.axhline(y=0, color='k', linestyle='-', alpha=0.3)
     plt.xlabel('Metric')
     plt.ylabel('Value')
-    plt.title('Model Comparison Metrics (Higher is Better)')
+    plt.title('Model Comparison Metrics')
     plt.xticks(x, metrics)
     plt.legend()
     plt.grid(True, alpha=0.3)

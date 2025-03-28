@@ -68,4 +68,12 @@ The program that computes maximum likelihood paramter is `code/optimize_antikyth
 python code/optimize_antikythera.py
 ```
 
+The HMC sampling is computed using `code/hmc.py`. To execute:
+```sh
+python code/hmc.py
+```
 
+The final comparison of the models uses the script `code/comparison.py`.
+```sh
+python code/comparison.py
+```
