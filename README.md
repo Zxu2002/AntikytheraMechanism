@@ -77,3 +77,7 @@ The final comparison of the models uses the script `code/comparison.py`.
 ```sh
 python code/comparison.py
 ```
+
+### Declaration
+This repository was developed with the assistance from Anthropic’s Claude 3.5 Sonnet. Specifically, Claude was used to assist with debugging Python code implementations. All AI-generated suggestions were manually reviewed.
+
